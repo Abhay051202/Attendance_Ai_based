@@ -12,7 +12,7 @@ from core.face_recognition import FaceRecognitionHandler
 class AttendanceAPI:
     def __init__(self):
         self.db = DatabaseManager()
-        self.face_handler = FaceRecognitionHandler()
+        self.face_handler = FaceRecognitionHandler(self.db)
 
     # --- PERSON MANAGEMENT (CRUD) ---
 

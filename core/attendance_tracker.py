@@ -25,7 +25,7 @@ class AttendanceTracker:
         
         # --- PART 1: RAW LOGGING ---
         if person_id not in self.last_log_time or \
-           (current_ts - self.last_log_time[person_id] > 90.0):
+           (current_ts - self.last_log_time[person_id] > 10.0):
             
             self.db_manager.log_raw_detection(person_id, person_name)
             self.last_log_time[person_id] = current_ts

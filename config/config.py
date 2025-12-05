@@ -16,7 +16,7 @@ Configuration file for Face Recognition Attendance System
 MYSQL_CONFIG = {
     'user': 'team',
     'password': 'Team@123',
-    'host': '192.168.1.106',   # Your PC IP
+    'host': '192.168.1.106',  
     'port': 3306,
     'database': 'demo',
 }

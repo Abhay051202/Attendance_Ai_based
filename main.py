@@ -26,7 +26,7 @@ class AttendanceSystem:
     def display_menu(self):
         """Display main menu"""
         print("\n" + "="*60)
-        print("       FACE ATTENDANCE SYSTEM (CLI MODE)")
+        print("FACE ATTENDANCE SYSTEM (CLI MODE)")
         print("="*60)
         print("1. START Automatic Attendance (Camera)")
         print("2. Register New Person (With Shifts)")

@@ -13,7 +13,7 @@ app = Flask(__name__)
 api = AttendanceAPI()
 
 # Sync Cache with DB on Startup
-Utils.sync_cache_with_db(api.db, api.face_handler)
+# Utils.sync_cache_with_db(api.db, api.face_handler)
 
 # --- ROUTES ---
 
