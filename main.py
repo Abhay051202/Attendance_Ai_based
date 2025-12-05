@@ -17,7 +17,7 @@ class AttendanceSystem:
         
         # Initialize components
         self.db_manager = DatabaseManager()
-        self.face_handler = FaceRecognitionHandler('data/face_encodings.pkl')
+        self.face_handler = FaceRecognitionHandler(self.db_manager)
         self.attendance_tracker = AttendanceTracker(self.db_manager, self.face_handler)
         self.video_processor = VideoProcessor(self.face_handler)
         

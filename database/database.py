@@ -260,6 +260,36 @@ class DatabaseManager:
         finally:
             conn.close()
 
+    def get_all_face_encodings(self):
+        """
+        Retrieve all face encodings from the database.
+        Returns: Dictionary {person_id: {'name': name, 'encoding': numpy_array}}
+        """
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT person_id, name, face_encoding FROM persons")
+            rows = cursor.fetchall()
+            
+            encodings = {}
+            for pid, name, encoded_data in rows:
+                if encoded_data:
+                    try:
+                        # Decode base64 and unpickle
+                        face_data = pickle.loads(base64.b64decode(encoded_data))
+                        encodings[pid] = {
+                            'name': name,
+                            'encoding': face_data
+                        }
+                    except Exception as e:
+                        print(f"Error decoding face for {name} ({pid}): {e}")
+            return encodings
+        except Exception as e:
+            print(f"DB Error fetching encodings: {e}")
+            return {}
+        finally:
+            conn.close()
+
     def delete_person(self, person_id):
         """Delete a person and their logs"""
         try:

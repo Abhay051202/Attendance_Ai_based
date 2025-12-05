@@ -7,10 +7,12 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from database.database import DatabaseManager
+from core.face_recognition import FaceRecognitionHandler
 
 class AttendanceAPI:
     def __init__(self):
         self.db = DatabaseManager()
+        self.face_handler = FaceRecognitionHandler()
 
     # --- PERSON MANAGEMENT (CRUD) ---
 
@@ -67,7 +69,10 @@ class AttendanceAPI:
         Delete a person and their associated logs.
         Returns: (success, message)
         """
-        return self.db.delete_person(person_id)
+        success, msg = self.db.delete_person(person_id)
+        if success:
+            self.face_handler.remove_face_encoding(person_id)
+        return success, msg
 
     # --- ATTENDANCE DATA ---
 

@@ -1,10 +1,8 @@
 import numpy as np
-import pickle
-import os
 from insightface.app import FaceAnalysis
 
 class FaceRecognitionHandler:
-    def __init__(self, face_db_path='data/face_encodings.pkl', similarity_threshold=0.6):
+    def __init__(self, db_manager, similarity_threshold=0.6):
         # Initialize InsightFace
         self.app = FaceAnalysis(
             name='buffalo_l', 
@@ -12,7 +10,7 @@ class FaceRecognitionHandler:
         )
         self.app.prepare(ctx_id=0, det_size=(640, 640))
         
-        self.face_db_path = face_db_path
+        self.db_manager = db_manager
         self.similarity_threshold = similarity_threshold
         self.registered_faces = self.load_face_encodings()
     
@@ -34,25 +32,8 @@ class FaceRecognitionHandler:
         return faces[0].embedding, "Face encoding extracted successfully"
     
     def load_face_encodings(self):
-        """Load face encodings from pickle file"""
-        if os.path.exists(self.face_db_path):
-            try:
-                with open(self.face_db_path, 'rb') as f:
-                    return pickle.load(f)
-            except Exception as e:
-                print(f"Error loading face encodings: {e}")
-                return {}
-        return {}
-    
-    def save_face_encodings(self):
-        """Save face encodings to pickle file"""
-        try:
-            with open(self.face_db_path, 'wb') as f:
-                pickle.dump(self.registered_faces, f)
-            return True
-        except Exception as e:
-            print(f"Error saving face encodings: {e}")
-            return False
+        """Load face encodings from database"""
+        return self.db_manager.get_all_face_encodings()
     
     def add_face_encoding(self, person_id, name, face_encoding):
         """Add a face encoding to the in-memory database"""
@@ -60,13 +41,13 @@ class FaceRecognitionHandler:
             'name': name,
             'encoding': face_encoding
         }
-        return self.save_face_encodings()
+        return True
     
     def remove_face_encoding(self, person_id):
         """Remove a face encoding from the database"""
         if person_id in self.registered_faces:
             del self.registered_faces[person_id]
-            return self.save_face_encodings() # This MUST be here to save to .pkl
+            return True
         return False
     
     def calculate_similarity(self, encoding1, encoding2):
@@ -135,7 +116,7 @@ class FaceRecognitionHandler:
         return list(self.registered_faces.keys())
     
     def reload_face_encodings(self):
-        """Reload face encodings from file"""
+        """Reload face encodings from database"""
         self.registered_faces = self.load_face_encodings()
         return len(self.registered_faces)
     

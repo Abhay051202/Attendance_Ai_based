@@ -7,9 +7,13 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core.api import AttendanceAPI
+from core.utils import Utils
 
 app = Flask(__name__)
 api = AttendanceAPI()
+
+# Sync Cache with DB on Startup
+Utils.sync_cache_with_db(api.db, api.face_handler)
 
 # --- ROUTES ---
 

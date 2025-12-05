@@ -7,10 +7,9 @@ import math
 from datetime import datetime, timedelta, date
 import os
 import csv
+import sys
 
 # --- IMPORT BACKEND ---
-# Adjusted imports for new structure
-import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from database.database import DatabaseManager
@@ -18,6 +17,7 @@ from core.face_recognition import FaceRecognitionHandler
 from core.attendance_tracker import AttendanceTracker
 from core.video_processor import VideoProcessor
 from core.registration import RegistrationModule
+from core.utils import Utils
 
 # --- THEME COLORS ---
 COLORS = {
@@ -48,20 +48,18 @@ class FaceAttendancePro:
         
         print("Initializing System...")
         self.db = DatabaseManager()
-        # Updated path for data
-        self.face_handler = FaceRecognitionHandler('data/face_encodings.pkl')
+        self.face_handler = FaceRecognitionHandler(self.db)
         self.tracker = AttendanceTracker(self.db, self.face_handler)
         self.processor = VideoProcessor(self.face_handler)
-        self.processor2 = VideoProcessor(self.face_handler) # Second processor for Camera 1
+        self.processor2 = VideoProcessor(self.face_handler)
         self.registrar = RegistrationModule(self.db, self.face_handler)
         
-        self.caps = [] # List to hold captures
+        self.caps = []
         self.is_running = False
-        self.is_paused = False  # New flag for pause state
+        self.is_paused = False
         self.current_view = "dashboard"
         self.record_view_mode = "summary"
         
-        # Camera Sources
         self.camera_source_1 = tk.StringVar(value="Camera 0")
         self.camera_source_2 = tk.StringVar(value="Camera 1")
         
@@ -71,16 +69,12 @@ class FaceAttendancePro:
         self.animate_pulse()
 
     def setup_ui(self):
-        # Sidebar
         self.sidebar = tk.Frame(self.root, bg=COLORS['sidebar'], width=220)
         self.sidebar.pack(side="left", fill="y"); self.sidebar.pack_propagate(False)
         
         try:
-            # Updated path for image
             img_path = "ui/prosper1.png"
-            if not os.path.exists(img_path):
-                 img_path = "prosper1.png" # Fallback if run from ui/
-
+            if not os.path.exists(img_path): img_path = "prosper1.png"
             if os.path.exists(img_path):
                 pil = Image.open(img_path); w=200; h=int(float(pil.size[1])*(w/float(pil.size[0])))
                 self.logo_img = ImageTk.PhotoImage(pil.resize((w,h), Image.Resampling.LANCZOS))
@@ -94,7 +88,6 @@ class FaceAttendancePro:
         self.create_nav_btn("Records & Reports", self.show_records)
         self.create_nav_btn("Exit System", self.close_app, color=COLORS['danger'])
         
-        # Main Area
         self.main_area = tk.Frame(self.root, bg=COLORS['bg'])
         self.main_area.pack(side="right", fill="both", expand=True, padx=15, pady=15)
         self.frame_dashboard = tk.Frame(self.main_area, bg=COLORS['bg'])
@@ -108,69 +101,45 @@ class FaceAttendancePro:
         btn = ModernButton(self.sidebar, text=text, command=command, bg=COLORS['sidebar'], fg=COLORS['text'], activebackground=color, width=20)
         btn.pack(pady=8, padx=15, fill="x")
 
-                          # ================= DASHBOARD =================
     def setup_dashboard(self):
-        header = tk.Frame(self.frame_dashboard, bg=COLORS['bg']); header.pack(fill="x", pady=(0, 15))
-        tk.Label(header, text="Live Dashboard", font=("Segoe UI", 22, "bold"), bg=COLORS['bg'], fg=COLORS['text']).pack(side="left")
-        self.canvas_pulse = tk.Canvas(header, width=20, height=20, bg=COLORS['bg'], highlightthickness=0); self.canvas_pulse.pack(side="left", padx=15)
-        self.pulse_circle = self.canvas_pulse.create_oval(2,2,18,18, fill=COLORS['danger'], outline="") 
-        self.lbl_status = tk.Label(header, text="SYSTEM OFFLINE", font=("Segoe UI", 10, "bold"), bg=COLORS['bg'], fg=COLORS['danger'])
-        self.lbl_status.pack(side="left")
+        h = tk.Frame(self.frame_dashboard, bg=COLORS['bg']); h.pack(fill="x", pady=(0, 20))
+        tk.Label(h, text="Dashboard", font=("Segoe UI", 24, "bold"), bg=COLORS['bg'], fg=COLORS['text']).pack(side="left")
+        self.lbl_status = tk.Label(h, text="SYSTEM OFFLINE", font=("Segoe UI", 12, "bold"), bg=COLORS['bg'], fg=COLORS['danger']); self.lbl_status.pack(side="right")
+        
+        st = tk.Frame(self.frame_dashboard, bg=COLORS['bg']); st.pack(fill="x", pady=(0, 20))
+        self.card_total = self.create_stat_card(st, "Total Registered", "0", "users")
+        self.card_present = self.create_stat_card(st, "Present Today", "0", "check")
+        
+        c = tk.Frame(self.frame_dashboard, bg=COLORS['card'], padx=10, pady=10); c.pack(fill="x", pady=(0, 10))
+        tk.Label(c, text="Cam 1:", bg=COLORS['card'], fg=COLORS['text']).pack(side="left")
+        self.camera_source_1 = tk.StringVar(value="Camera 0")
+        self.cam_combo_1 = ttk.Combobox(c, textvariable=self.camera_source_1, values=[f"Camera {i}" for i in range(5)], width=8); self.cam_combo_1.pack(side="left", padx=5)
+        tk.Label(c, text="Cam 2:", bg=COLORS['card'], fg=COLORS['text']).pack(side="left", padx=(10,0))
+        self.camera_source_2 = tk.StringVar(value="Camera 1")
+        self.cam_combo_2 = ttk.Combobox(c, textvariable=self.camera_source_2, values=[f"Camera {i}" for i in range(5)], width=8); self.cam_combo_2.pack(side="left", padx=5)
+        self.btn_cam_toggle = ModernButton(c, text="START CAMERAS", command=self.toggle_camera, bg=COLORS['accent'], fg="#1e1e2e"); self.btn_cam_toggle.pack(side="right")
+        self.btn_pause = ModernButton(c, text="PAUSE", command=self.toggle_pause, bg=COLORS['warning'], fg="#1e1e2e", state="disabled"); self.btn_pause.pack(side="right", padx=10)
+        
+        g = tk.Frame(self.frame_dashboard, bg=COLORS['bg']); g.pack(fill="both", expand=True)
+        f1 = tk.Frame(g, bg="black"); f1.pack(side="left", fill="both", expand=True, padx=(0,5))
+        self.video_label_1 = tk.Label(f1, bg="black", text="Camera 1 Off", fg="white"); self.video_label_1.pack(fill="both", expand=True)
+        f2 = tk.Frame(g, bg="black"); f2.pack(side="left", fill="both", expand=True, padx=(5,0))
+        self.video_label_2 = tk.Label(f2, bg="black", text="Camera 2 Off", fg="white"); self.video_label_2.pack(fill="both", expand=True)
+        
+        l = tk.Frame(self.frame_dashboard, bg=COLORS['card'], height=150); l.pack(fill="x", pady=(10, 0)); l.pack_propagate(False)
+        tk.Label(l, text="Live Logs", bg=COLORS['card'], fg=COLORS['text'], font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=5, pady=2)
+        self.log_list = tk.Listbox(l, bg=COLORS['card'], fg=COLORS['text'], relief="flat", highlightthickness=0); self.log_list.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        self.canvas_pulse = tk.Canvas(self.root, width=0, height=0); self.pulse_circle = self.canvas_pulse.create_oval(0,0,0,0)
 
-        grid = tk.Frame(self.frame_dashboard, bg=COLORS['bg']); grid.pack(fill="both", expand=True)
-        
-        # Video Container (Split for 2 Cameras)
-        video_container = tk.Frame(grid, bg=COLORS['card'], padx=2, pady=2); video_container.pack(side="left", fill="both", expand=True, padx=(0, 15))
-        
-        # Video Area (Holds the two camera feeds)
-        video_area = tk.Frame(video_container, bg="black")
-        video_area.pack(side="top", fill="both", expand=True)
-        
-        # Camera 1 Label
-        self.video_label_1 = tk.Label(video_area, bg="black", text="Camera 1 Off", fg="white")
-        self.video_label_1.pack(side="left", fill="both", expand=True, padx=(0, 1))
-        
-        # Camera 2 Label
-        self.video_label_2 = tk.Label(video_area, bg="black", text="Camera 2 Off", fg="white")
-        self.video_label_2.pack(side="left", fill="both", expand=True, padx=(1, 0))
-
-        ctrl = tk.Frame(video_container, bg=COLORS['card'], height=50); ctrl.pack(side="bottom", fill="x", pady=5)
-        
-        # Camera Selection 1
-        tk.Label(ctrl, text="Cam 1:", bg=COLORS['card'], fg=COLORS['text']).pack(side="left", padx=5)
-        self.cam_combo_1 = ttk.Combobox(ctrl, textvariable=self.camera_source_1, values=[f"Camera {i}" for i in range(6)], state="readonly", width=8)
-        self.cam_combo_1.pack(side="left", padx=5)
-        
-        # Camera Selection 2
-        tk.Label(ctrl, text="Cam 2:", bg=COLORS['card'], fg=COLORS['text']).pack(side="left", padx=5)
-        self.cam_combo_2 = ttk.Combobox(ctrl, textvariable=self.camera_source_2, values=[f"Camera {i}" for i in range(6)], state="readonly", width=8)
-        self.cam_combo_2.pack(side="left", padx=5)
-        
-        # Pause Button
-        self.btn_pause = ModernButton(ctrl, text="PAUSE", command=self.toggle_pause, bg=COLORS['warning'], fg="#1e1e2e", width=10)
-        self.btn_pause.pack(side="right", padx=5)
-        self.btn_pause.config(state="disabled") # Disabled initially
-
-        self.btn_cam_toggle = ModernButton(ctrl, text="START CAMERAS", command=self.toggle_camera, bg=COLORS['accent'], fg="#1e1e2e", width=15)
-        self.btn_cam_toggle.pack(side="right", padx=5)
-        
-        # Stats
-        stats = tk.Frame(grid, bg=COLORS['bg'], width=300); stats.pack(side="right", fill="y"); stats.pack_propagate(False)
-        self.card_total = self.create_stat_card(stats, "Total Registered", "0", COLORS['accent'])
-        self.card_present = self.create_stat_card(stats, "Present Today", "0", COLORS['success'])
-        tk.Label(stats, text="Live Activity Feed", font=("Segoe UI", 11, "bold"), bg=COLORS['bg'], fg=COLORS['text']).pack(anchor="w", pady=(15,5))
-        self.log_list = tk.Listbox(stats, bg=COLORS['card'], fg=COLORS['text'], font=("Consolas", 9), borderwidth=0, highlightthickness=0)
-        self.log_list.pack(fill="both", expand=True)
-
-    def create_stat_card(self, parent, title, value, color):
-        card = tk.Frame(parent, bg=COLORS['card'], padx=10, pady=10); card.pack(fill="x", pady=(0,10))
-        tk.Frame(card, bg=color, width=4).pack(side="left", fill="y", padx=(0,10))
+    def create_stat_card(self, parent, title, value, icon):
+        card = tk.Frame(parent, bg=COLORS['card'], padx=15, pady=15); card.pack(side="left", fill="x", expand=True, padx=5)
+        tk.Label(card, text="●", font=("Segoe UI", 20), bg=COLORS['card'], fg=COLORS['accent']).pack(side="left", padx=(0, 15))
         info = tk.Frame(card, bg=COLORS['card']); info.pack(side="left")
         tk.Label(info, text=title, font=("Segoe UI", 9), bg=COLORS['card'], fg="#a6adc8").pack(anchor="w")
         lbl = tk.Label(info, text=value, font=("Segoe UI", 16, "bold"), bg=COLORS['card'], fg=COLORS['text']); lbl.pack(anchor="w")
         return lbl
 
-                         # ================= REGISTRATION =================
     def setup_registration(self):
         tk.Label(self.frame_register, text="New Person Registration", font=("Segoe UI", 22, "bold"), bg=COLORS['bg'], fg=COLORS['text']).pack(anchor="w", pady=(0, 20))
         
@@ -215,7 +184,6 @@ class FaceAttendancePro:
         self.reg_video_label.configure(image='', text="No Image Captured")
         self.reg_video_label.imgtk = None
 
-                        # ================= RECORDS =================
     def setup_records(self):
         tk.Label(self.frame_records, text="Records & Reports", font=("Segoe UI", 22, "bold"), bg=COLORS['bg'], fg=COLORS['text']).pack(anchor="w", pady=(0, 15))
         
@@ -280,7 +248,6 @@ class FaceAttendancePro:
         
         self.switch_record_view("summary")
 
-                                   # ================= LOGIC =================
     def switch_record_view(self, mode):
         self.record_view_mode = mode
         for btn in [self.btn_summary, self.btn_logs, self.btn_edit]: btn.configure(bg=COLORS['card'], fg=COLORS['text'])
@@ -419,7 +386,6 @@ class FaceAttendancePro:
                 
         self.root.after(10, self.update_video_loop)
 
-              # ================= ACTIONS =================
     def perform_registration(self):
         pid = self.reg_entries["Person ID (Unique)"].get()
         name = self.reg_entries["Full Name"].get()
@@ -438,13 +404,13 @@ class FaceAttendancePro:
         if not ret: messagebox.showerror("Error", "Failed capture"); return
         img = frame
         
-                            # 2. Show Preview
+        # 2. Show Preview
         prev = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         prev.thumbnail((400, 300))
         p_tk = ImageTk.PhotoImage(image=prev)
         self.reg_video_label.imgtk = p_tk; self.reg_video_label.configure(image=p_tk, text="")
 
-                          # 3. Extract & Save
+        # 3. Extract & Save
         encoding, msg = self.face_handler.extract_face_encoding(img)
         if encoding is None: messagebox.showerror("Face Error", msg); return
         
