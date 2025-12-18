@@ -199,6 +199,7 @@ class DatabaseManager:
                     VALUES (%s, %s, %s, %s, 'Present')
                 ''', (person_id, today, current_time, current_time))
                 conn.commit()
+                print(f"[DATABASE] ✓ Created attendance record: {person_id} - {current_time}")
                 return f"LOGIN: {current_time}"
             else:
                 # --- UPDATE LEAVING TIME (Always update to latest seen) ---
@@ -208,6 +209,7 @@ class DatabaseManager:
                     WHERE person_id = %s AND date = %s
                 ''', (current_time, person_id, today))
                 conn.commit()
+                print(f"[DATABASE] ✓ Updated leaving_time: {person_id} - {current_time}")
                 
                 # Check if shift is over for voice feedback
                 if now.hour >= user_shift_end_hour:
@@ -216,6 +218,7 @@ class DatabaseManager:
                     return f"Shift Ongoing (Ends {user_shift_end_str})"
                 
         except mysql.connector.Error as err:
+            print(f"[DATABASE] ✗ Error: {err}")
             return f"DB Error: {err}"
         finally:
             conn.close()
